@@ -1,10 +1,10 @@
-# 🚶 Caminhadas
+#  Caminhadas
 
 Aplicativo desenvolvido para a atividade final da **Aula 05 - Mapas**, do curso de Desenvolvimento de Sistemas do SENAI.
 
 O aplicativo permite criar e registrar caminhadas, escolhendo um destino no mapa, calculando a distância, o tempo estimado e as calorias gastas. As caminhadas ficam salvas localmente para serem consultadas posteriormente.
 
-## 📱 Funcionalidades
+##  Funcionalidades
 
 - Splash Screen com animação
 - Tela inicial com lista de caminhadas
@@ -19,7 +19,7 @@ O aplicativo permite criar e registrar caminhadas, escolhendo um destino no mapa
 - Tela de detalhes da caminhada
 - Adição de fotos utilizando a câmera do dispositivo
 
-## 🛠️ Tecnologias utilizadas
+##  Tecnologias utilizadas
 
 - Flutter
 - Dart
@@ -29,17 +29,17 @@ O aplicativo permite criar e registrar caminhadas, escolhendo um destino no mapa
 - SharedPreferences
 - Image Picker
 
-## 🗺️ Mapas e rotas
+##  Mapas e rotas
 
 O aplicativo utiliza o **Flutter Map** para exibição dos mapas e o **OpenStreetMap** como fonte dos mapas.
 
 Para calcular e traçar as rotas, foi utilizada a API do **OSRM (Open Source Routing Machine)**.
 
-## 💾 Armazenamento
+##  Armazenamento
 
 As caminhadas são armazenadas localmente no dispositivo utilizando o pacote **SharedPreferences**, permitindo que os registros continuem disponíveis mesmo depois de fechar e abrir o aplicativo novamente.
 
-## 📸 Telas do aplicativo
+##  Telas do aplicativo
 
 ### Splash Screen
 
@@ -65,7 +65,7 @@ As caminhadas são armazenadas localmente no dispositivo utilizando o pacote **S
 
 ![Detalhes](print/detalhes.png)
 
-## ▶️ Como executar o projeto
+##  Como executar o projeto
 
 ### Pré-requisitos
 
