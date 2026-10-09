@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -52,37 +53,41 @@ class Caminhada {
       'latitudeDestino': latitudeDestino,
       'longitudeDestino': longitudeDestino,
       'rota': rota
-          .map(
-            (ponto) => {
-              'latitude': ponto.latitude,
-              'longitude': ponto.longitude,
-            },
-          )
+          .map((ponto) => {
+                'latitude': ponto.latitude,
+                'longitude': ponto.longitude,
+              })
           .toList(),
       'foto': foto,
     };
   }
 
   factory Caminhada.fromJson(Map<String, dynamic> json) {
-    final pontos = (json['rota'] as List<dynamic>? ?? []);
+    final pontos = json['rota'] as List<dynamic>? ?? [];
 
     return Caminhada(
-      id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      titulo: json['titulo'] ?? 'Caminhada',
-      distancia: (json['distancia'] ?? 0).toDouble(),
-      calorias: (json['calorias'] ?? 0).toInt(),
-      tempo: (json['tempo'] ?? 0).toInt(),
-      latitudeInicial: (json['latitudeInicial'] ?? -22.713).toDouble(),
-      longitudeInicial: (json['longitudeInicial'] ?? -46.818).toDouble(),
-      latitudeDestino: (json['latitudeDestino'] ?? -22.713).toDouble(),
-      longitudeDestino: (json['longitudeDestino'] ?? -46.818).toDouble(),
-      rota: pontos.map((ponto) {
+      id: json['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      titulo: json['titulo']?.toString() ?? 'Caminhada',
+      distancia: (json['distancia'] as num? ?? 0).toDouble(),
+      calorias: (json['calorias'] as num? ?? 0).toInt(),
+      tempo: (json['tempo'] as num? ?? 0).toInt(),
+      latitudeInicial:
+          (json['latitudeInicial'] as num? ?? -22.713).toDouble(),
+      longitudeInicial:
+          (json['longitudeInicial'] as num? ?? -46.818).toDouble(),
+      latitudeDestino:
+          (json['latitudeDestino'] as num? ?? -22.713).toDouble(),
+      longitudeDestino:
+          (json['longitudeDestino'] as num? ?? -46.818).toDouble(),
+      rota: pontos.map<LatLng>((ponto) {
+        final dados = Map<String, dynamic>.from(ponto);
         return LatLng(
-          (ponto['latitude'] ?? 0).toDouble(),
-          (ponto['longitude'] ?? 0).toDouble(),
+          (dados['latitude'] as num? ?? 0).toDouble(),
+          (dados['longitude'] as num? ?? 0).toDouble(),
         );
       }).toList(),
-      foto: json['foto'],
+      foto: json['foto']?.toString(),
     );
   }
 }
@@ -108,24 +113,33 @@ class _CaminhadasAppState extends State<CaminhadasApp> {
     final prefs = await SharedPreferences.getInstance();
     final dados = prefs.getString('caminhadas');
 
-    if (dados != null) {
+    if (dados == null) {
+      return;
+    }
+
+    try {
       final lista = jsonDecode(dados) as List<dynamic>;
+
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         caminhadas = lista
-            .map(
-              (item) => Caminhada.fromJson(
-                Map<String, dynamic>.from(item),
-              ),
-            )
+            .map((item) => Caminhada.fromJson(
+                  Map<String, dynamic>.from(item),
+                ))
             .toList();
+      });
+    } catch (_) {
+      setState(() {
+        caminhadas = [];
       });
     }
   }
 
   Future<void> salvarLista() async {
     final prefs = await SharedPreferences.getInstance();
-
     final dados = jsonEncode(
       caminhadas.map((caminhada) => caminhada.toJson()).toList(),
     );
@@ -199,8 +213,9 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  late AnimationController controller;
-  late Animation<double> animation;
+  late final AnimationController controller;
+  late final Animation<double> animation;
+  Timer? timer;
 
   @override
   void initState() {
@@ -208,7 +223,7 @@ class _SplashPageState extends State<SplashPage>
 
     controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 800),
     );
 
     animation = CurvedAnimation(
@@ -218,7 +233,13 @@ class _SplashPageState extends State<SplashPage>
 
     controller.forward();
 
-    Timer(const Duration(seconds: 3), () {
+    timer = Timer(const Duration(milliseconds: 2500), () async {
+      if (!mounted) {
+        return;
+      }
+
+      await controller.reverse();
+
       if (!mounted) {
         return;
       }
@@ -234,6 +255,7 @@ class _SplashPageState extends State<SplashPage>
 
   @override
   void dispose() {
+    timer?.cancel();
     controller.dispose();
     super.dispose();
   }
@@ -245,32 +267,38 @@ class _SplashPageState extends State<SplashPage>
       body: Center(
         child: FadeTransition(
           opacity: animation,
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.directions_walk,
-                color: Colors.white,
-                size: 100,
-              ),
-              SizedBox(height: 20),
-              Text(
-                'Caminhadas',
-                style: TextStyle(
+          child: ScaleTransition(
+            scale: Tween<double>(
+              begin: 0.8,
+              end: 1,
+            ).animate(animation),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.directions_walk,
                   color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
+                  size: 100,
                 ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Registre seus caminhos',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
+                SizedBox(height: 20),
+                Text(
+                  'Caminhadas',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+                SizedBox(height: 8),
+                Text(
+                  'Registre seus caminhos',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -337,8 +365,21 @@ class HomePage extends StatelessWidget {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.animation),
+                title: const Text('Splash'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SplashPage(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.brightness_6),
-                title: const Text('Alterar tema'),
+                title: const Text('Tema claro/escuro'),
                 onTap: () {
                   Navigator.pop(context);
                   appState?.alternarTema();
@@ -348,7 +389,7 @@ class HomePage extends StatelessWidget {
                 leading: const Icon(Icons.logout),
                 title: const Text('Sair'),
                 onTap: () {
-                  Navigator.pop(context);
+                  SystemNavigator.pop();
                 },
               ),
             ],
@@ -356,9 +397,7 @@ class HomePage extends StatelessWidget {
         ),
       ),
       body: appState == null
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : appState.caminhadas.isEmpty
               ? const Center(
                   child: Text(
@@ -394,8 +433,8 @@ class HomePage extends StatelessWidget {
                           '${caminhada.calorias} kcal',
                         ),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => DetalhesPage(
@@ -409,8 +448,8 @@ class HomePage extends StatelessWidget {
                   },
                 ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const NovaCaminhadaPage(),
@@ -459,10 +498,7 @@ class _NovaCaminhadaPageState extends State<NovaCaminhadaPage> {
       distanciaKm = distancia;
       calorias = (distancia * 60).round();
       tempoMinutos = (distancia / 5 * 60).round();
-      rota = [
-        pontoInicial,
-        novoDestino,
-      ];
+      rota = [pontoInicial, novoDestino];
     });
 
     buscarRota(novoDestino);
@@ -475,23 +511,29 @@ class _NovaCaminhadaPageState extends State<NovaCaminhadaPage> {
 
     try {
       final url = Uri.parse(
-        'https://router.project-osrm.org/route/v1/walking/'
+        'https://router.project-osrm.org/route/v1/foot/'
         '${pontoInicial.longitude},${pontoInicial.latitude};'
         '${novoDestino.longitude},${novoDestino.latitude}'
         '?overview=full&geometries=geojson',
       );
 
       final resposta = await http.get(url).timeout(
-        const Duration(seconds: 8),
-      );
+            const Duration(seconds: 15),
+          );
 
       if (resposta.statusCode == 200) {
         final dados = jsonDecode(resposta.body);
+        final rotas = dados['routes'] as List<dynamic>;
 
-        final rotaJson =
-            dados['routes'][0]['geometry']['coordinates'] as List;
+        if (rotas.isEmpty) {
+          throw Exception('Nenhuma rota encontrada.');
+        }
 
-        final novaRota = rotaJson.map<LatLng>((ponto) {
+        final primeiraRota = rotas.first;
+        final coordenadas =
+            primeiraRota['geometry']['coordinates'] as List<dynamic>;
+
+        final novaRota = coordenadas.map<LatLng>((ponto) {
           return LatLng(
             (ponto[1] as num).toDouble(),
             (ponto[0] as num).toDouble(),
@@ -499,38 +541,29 @@ class _NovaCaminhadaPageState extends State<NovaCaminhadaPage> {
         }).toList();
 
         final distanciaRota =
-            (dados['routes'][0]['distance'] as num).toDouble() / 1000;
-
-        final novoTempo =
-            (distanciaRota / 5 * 60).round();
-
-        final novasCalorias =
-            (distanciaRota * 60).round();
+            (primeiraRota['distance'] as num).toDouble() / 1000;
 
         if (mounted) {
           setState(() {
             rota = novaRota;
             distanciaKm = distanciaRota;
-            tempoMinutos = novoTempo;
-            calorias = novasCalorias;
+            tempoMinutos = (distanciaRota / 5 * 60).round();
+            calorias = (distanciaRota * 60).round();
           });
         }
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          rota = [
-            pontoInicial,
-            novoDestino,
-          ];
+          rota = [pontoInicial, novoDestino];
         });
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        carregandoRota = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          carregandoRota = false;
+        });
+      }
     }
   }
 
@@ -706,8 +739,7 @@ class _NovaCaminhadaPageState extends State<NovaCaminhadaPage> {
                       _Informacao(
                         icone: Icons.straighten,
                         titulo: 'Distância',
-                        valor:
-                            '${distanciaKm.toStringAsFixed(2)} km',
+                        valor: '${distanciaKm.toStringAsFixed(2)} km',
                       ),
                       _Informacao(
                         icone: Icons.local_fire_department,
@@ -754,6 +786,7 @@ class DetalhesPage extends StatefulWidget {
 class _DetalhesPageState extends State<DetalhesPage> {
   late Caminhada caminhada;
   final ImagePicker picker = ImagePicker();
+  bool tirandoFoto = false;
 
   @override
   void initState() {
@@ -762,45 +795,86 @@ class _DetalhesPageState extends State<DetalhesPage> {
   }
 
   Future<void> tirarFoto() async {
-    final foto = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
-
-    if (foto == null || !mounted) {
-      return;
-    }
-
-    final appState =
-        context.findAncestorStateOfType<_CaminhadasAppState>();
-
-    if (appState == null) {
-      return;
-    }
-
-    final atualizada = Caminhada(
-      id: caminhada.id,
-      titulo: caminhada.titulo,
-      distancia: caminhada.distancia,
-      calorias: caminhada.calorias,
-      tempo: caminhada.tempo,
-      latitudeInicial: caminhada.latitudeInicial,
-      longitudeInicial: caminhada.longitudeInicial,
-      latitudeDestino: caminhada.latitudeDestino,
-      longitudeDestino: caminhada.longitudeDestino,
-      rota: caminhada.rota,
-      foto: foto.path,
-    );
-
-    await appState.atualizarCaminhada(atualizada);
-
-    if (!mounted) {
+    if (tirandoFoto) {
       return;
     }
 
     setState(() {
-      caminhada = atualizada;
+      tirandoFoto = true;
     });
+
+    try {
+      final foto = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+
+      if (foto == null || !mounted) {
+        return;
+      }
+
+      final appState =
+          context.findAncestorStateOfType<_CaminhadasAppState>();
+
+      if (appState == null) {
+        throw Exception('Não foi possível acessar as caminhadas.');
+      }
+
+      final diretorio = await getApplicationDocumentsDirectory();
+      final pastaFotos = Directory('${diretorio.path}/fotos');
+
+      await pastaFotos.create(recursive: true);
+
+      final arquivoFoto = await File(foto.path).copy(
+        '${pastaFotos.path}/foto_${caminhada.id}.jpg',
+      );
+
+      final atualizada = Caminhada(
+        id: caminhada.id,
+        titulo: caminhada.titulo,
+        distancia: caminhada.distancia,
+        calorias: caminhada.calorias,
+        tempo: caminhada.tempo,
+        latitudeInicial: caminhada.latitudeInicial,
+        longitudeInicial: caminhada.longitudeInicial,
+        latitudeDestino: caminhada.latitudeDestino,
+        longitudeDestino: caminhada.longitudeDestino,
+        rota: caminhada.rota,
+        foto: arquivoFoto.path,
+      );
+
+      await appState.atualizarCaminhada(atualizada);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        caminhada = atualizada;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Foto salva com sucesso!'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao tirar ou salvar a foto: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          tirandoFoto = false;
+        });
+      }
+    }
   }
 
   @override
@@ -818,6 +892,9 @@ class _DetalhesPageState extends State<DetalhesPage> {
     final pontos = caminhada.rota.length >= 2
         ? caminhada.rota
         : [origem, destino];
+
+    final temFoto = caminhada.foto != null &&
+        File(caminhada.foto!).existsSync();
 
     return Scaffold(
       appBar: AppBar(
@@ -838,15 +915,16 @@ class _DetalhesPageState extends State<DetalhesPage> {
                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.caminhadas',
                 ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: pontos,
-                      strokeWidth: 5,
-                      color: Colors.green,
-                    ),
-                  ],
-                ),
+                if (pontos.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: pontos,
+                        strokeWidth: 5,
+                        color: Colors.green,
+                      ),
+                    ],
+                  ),
                 MarkerLayer(
                   markers: [
                     Marker(
@@ -909,8 +987,7 @@ class _DetalhesPageState extends State<DetalhesPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                if (caminhada.foto != null &&
-                    File(caminhada.foto!).existsSync())
+                if (temFoto)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Image.file(
@@ -918,6 +995,14 @@ class _DetalhesPageState extends State<DetalhesPage> {
                       height: 280,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const SizedBox(
+                          height: 220,
+                          child: Center(
+                            child: Text('Não foi possível carregar a foto.'),
+                          ),
+                        );
+                      },
                     ),
                   )
                 else
@@ -928,41 +1013,45 @@ class _DetalhesPageState extends State<DetalhesPage> {
                       borderRadius: BorderRadius.circular(16),
                       color: Colors.green.withValues(alpha: 0.1),
                     ),
-                    child: Column(
+                    child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.camera_alt,
                           size: 70,
                           color: Colors.green,
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
+                        SizedBox(height: 12),
+                        Text(
                           'Nenhuma foto adicionada',
                           style: TextStyle(fontSize: 16),
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton.icon(
-                          onPressed: tirarFoto,
-                          icon: const Icon(Icons.camera_alt),
-                          label: const Text('Tirar foto'),
                         ),
                       ],
                     ),
                   ),
-                if (caminhada.foto != null &&
-                    File(caminhada.foto!).existsSync())
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: tirarFoto,
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Tirar outra foto'),
-                      ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: tirandoFoto ? null : tirarFoto,
+                    icon: tirandoFoto
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.camera_alt),
+                    label: Text(
+                      tirandoFoto
+                          ? 'Abrindo câmera...'
+                          : temFoto
+                              ? 'Tirar outra foto'
+                              : 'Tirar foto',
                     ),
                   ),
+                ),
               ],
             ),
           ),
