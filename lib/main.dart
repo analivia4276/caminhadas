@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -132,6 +133,10 @@ class _CaminhadasAppState extends State<CaminhadasApp> {
             .toList();
       });
     } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         caminhadas = [];
       });
@@ -306,9 +311,14 @@ class _SplashPageState extends State<SplashPage>
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final appState =
@@ -442,6 +452,10 @@ class HomePage extends StatelessWidget {
                               ),
                             ),
                           );
+
+                          if (mounted) {
+                            setState(() {});
+                          }
                         },
                       ),
                     );
@@ -455,6 +469,10 @@ class HomePage extends StatelessWidget {
               builder: (context) => const NovaCaminhadaPage(),
             ),
           );
+
+          if (mounted) {
+            setState(() {});
+          }
         },
         child: const Icon(Icons.add),
       ),
